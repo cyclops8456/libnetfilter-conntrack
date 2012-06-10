@@ -1,3 +1,13 @@
+libnetfilter-conntrack (1.0.0-1+vyatta10+oxnard2) unstable; urgency=low
+
+  [ Deepti Kulkarni ]
+  * new branch
+  * 1.0.0-1+vyatta10+oxnard1
+
+  [ Gaurav Sinha ]
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Sun, 10 Jun 2012 13:35:53 -0700
+
 libnetfilter-conntrack (1.0.0-1+vyatta10+oxnard1) unstable; urgency=low
 
   * merge Pacifica to get cthelper changes in 
