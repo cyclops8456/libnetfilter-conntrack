@@ -1,3 +1,10 @@
+libnetfilter-conntrack (1.0.0-1+vyatta10+oxnard6) unstable; urgency=low
+
+  * From f5317d351f95cbd320b9324c6ed117da1551ee29 Mon Sep 17 00:00:00
+    2001
+
+ -- Gaurav Sinha <gaurav.sinha@vyatta.com>  Mon, 03 Dec 2012 11:31:54 -0800
+
 libnetfilter-conntrack (1.0.0-1+vyatta10+oxnard5) unstable; urgency=low
 
   * Fix nat issue with len of function name > 16
