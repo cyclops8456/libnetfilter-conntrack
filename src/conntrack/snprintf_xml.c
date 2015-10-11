@@ -53,12 +53,12 @@
  * </flow>
  */
 
-const char *__proto2str(u_int8_t protonum)
+const char *__proto2str(uint8_t protonum)
 {
 	return proto2str[protonum] ? proto2str[protonum] : "unknown";
 }
 
-const char *__l3proto2str(u_int8_t protonum)
+const char *__l3proto2str(uint8_t protonum)
 {
 	return l3proto2str[protonum] ? l3proto2str[protonum] : "unknown";
 }
@@ -239,6 +239,18 @@ __snprintf_deltatime(char *buf, unsigned int len, const struct nf_conntrack *ct)
 	return size;
 }
 
+static int
+__snprintf_helper_name(char *buf, unsigned int len, const struct nf_conntrack *ct)
+{
+	int ret;
+	unsigned int size = 0, offset = 0;
+
+	ret = snprintf(buf+offset, len, "<helper>%s</helper>", ct->helper_name);
+	BUFFER_SIZE(ret, size, len, offset);
+
+	return size;
+}
+
 int
 __snprintf_localtime_xml(char *buf, unsigned int len, const struct tm *tm)
 {
@@ -272,7 +284,7 @@ __snprintf_localtime_xml(char *buf, unsigned int len, const struct tm *tm)
 static int __snprintf_tuple_xml(char *buf,
 				unsigned int len,
 				const struct nf_conntrack *ct,
-				unsigned int dir)
+				unsigned int dir, bool zone_incl)
 {
 	int ret;
 	unsigned int size = 0, offset = 0;
@@ -318,6 +330,11 @@ static int __snprintf_tuple_xml(char *buf,
 	ret = snprintf(buf+offset, len, "</layer4>");
 	BUFFER_SIZE(ret, size, len, offset);
 
+	if (zone_incl) {
+		ret = snprintf(buf+offset, len, "<zone>%u</zone>", tuple->zone);
+		BUFFER_SIZE(ret, size, len, offset);
+	}
+
 	if (test_bit(ATTR_ORIG_COUNTER_PACKETS, ct->head.set) &&
 	    test_bit(ATTR_ORIG_COUNTER_BYTES, ct->head.set)) {
 		ret = snprintf(buf+offset, len, "<counters>");
@@ -336,11 +353,35 @@ static int __snprintf_tuple_xml(char *buf,
 	return size;
 }
 
+static int
+__snprintf_clabels_xml(char *buf, unsigned int len,
+		       const struct nf_conntrack *ct, struct nfct_labelmap *map)
+{
+	const struct nfct_bitmask *b = nfct_get_attr(ct, ATTR_CONNLABELS);
+	int ret, size = 0, offset = 0;
+
+	if (!b)
+		return 0;
+
+	ret = snprintf(buf, len, "<labels>");
+	BUFFER_SIZE(ret, size, len, offset);
+
+	ret = __snprintf_connlabels(buf + offset, len, map, b, "<label>%s</label>");
+
+	BUFFER_SIZE(ret, size, len, offset);
+
+	ret = snprintf(buf + offset, len, "</labels>");
+	BUFFER_SIZE(ret, size, len, offset);
+
+	return size;
+}
+
 int __snprintf_conntrack_xml(char *buf,
 			     unsigned int len,
 			     const struct nf_conntrack *ct,
 			     const unsigned int msg_type,
-			     const unsigned int flags) 
+			     const unsigned int flags,
+			     struct nfct_labelmap *map)
 {
 	int ret = 0;
 	unsigned int size = 0, offset = 0;
@@ -362,10 +403,12 @@ int __snprintf_conntrack_xml(char *buf,
 
 	BUFFER_SIZE(ret, size, len, offset);
 
-	ret = __snprintf_tuple_xml(buf+offset, len, ct, __DIR_ORIG);
+	ret = __snprintf_tuple_xml(buf+offset, len, ct, __DIR_ORIG,
+				   test_bit(ATTR_ORIG_ZONE, ct->head.set));
 	BUFFER_SIZE(ret, size, len, offset);
 
-	ret = __snprintf_tuple_xml(buf+offset, len, ct, __DIR_REPL);
+	ret = __snprintf_tuple_xml(buf+offset, len, ct, __DIR_REPL,
+				   test_bit(ATTR_REPL_ZONE, ct->head.set));
 	BUFFER_SIZE(ret, size, len, offset);
 
 	if (test_bit(ATTR_TCP_STATE, ct->head.set) ||
@@ -378,6 +421,7 @@ int __snprintf_conntrack_xml(char *buf,
 	    test_bit(ATTR_USE, ct->head.set) ||
 	    test_bit(ATTR_STATUS, ct->head.set) ||
 	    test_bit(ATTR_ID, ct->head.set) ||
+	    test_bit(ATTR_CONNLABELS, ct->head.set) ||
 	    test_bit(ATTR_TIMESTAMP_START, ct->head.set) ||
 	    test_bit(ATTR_TIMESTAMP_STOP, ct->head.set)) {
 		ret = snprintf(buf+offset, len, 
@@ -417,6 +461,11 @@ int __snprintf_conntrack_xml(char *buf,
 
 	if (test_bit(ATTR_MARK, ct->head.set)) {
 		ret = snprintf(buf+offset, len, "<mark>%u</mark>", ct->mark);
+		BUFFER_SIZE(ret, size, len, offset);
+	}
+
+	if (map && test_bit(ATTR_CONNLABELS, ct->head.set)) {
+		ret = __snprintf_clabels_xml(buf+offset, len, ct, map);
 		BUFFER_SIZE(ret, size, len, offset);
 	}
 
@@ -498,6 +547,7 @@ int __snprintf_conntrack_xml(char *buf,
 	    test_bit(ATTR_USE, ct->head.set) ||
 	    test_bit(ATTR_STATUS, ct->head.set) ||
 	    test_bit(ATTR_ID, ct->head.set) ||
+	    test_bit(ATTR_CONNLABELS, ct->head.set) ||
 	    test_bit(ATTR_TIMESTAMP_START, ct->head.set) ||
 	    test_bit(ATTR_TIMESTAMP_STOP, ct->head.set)) {
 	    	ret = snprintf(buf+offset, len, "</meta>");
@@ -522,6 +572,10 @@ int __snprintf_conntrack_xml(char *buf,
 		BUFFER_SIZE(ret, size, len, offset);
 	}
 
+	if (test_bit(ATTR_HELPER_NAME, ct->head.set)) {
+		ret = __snprintf_helper_name(buf+offset, len, ct);
+		BUFFER_SIZE(ret, size, len, offset);
+	}
 err_out:
 	ret = snprintf(buf+offset, len, "</flow>");
 	BUFFER_SIZE(ret, size, len, offset);

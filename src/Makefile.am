@@ -10,7 +10,7 @@ lib_LTLIBRARIES = libnetfilter_conntrack.la
 
 libnetfilter_conntrack_la_LIBADD = conntrack/libnfconntrack.la \
 				   expect/libnfexpect.la \
-				   ${LIBNFNETLINK_LIBS}
-libnetfilter_conntrack_la_LDFLAGS = -Wc,-nostartfiles -lnfnetlink -ldl 	\
+				   ${LIBNFNETLINK_LIBS} ${LIBMNL_LIBS}
+libnetfilter_conntrack_la_LDFLAGS = -Wc,-nostartfiles -lnfnetlink \
 				    -version-info $(LIBVERSION)
 libnetfilter_conntrack_la_SOURCES = main.c callback.c

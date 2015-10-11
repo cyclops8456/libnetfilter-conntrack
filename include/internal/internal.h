@@ -78,8 +78,11 @@
 
 /* extracted from include/linux/netfilter/nf_conntrack_tcp.h .*/
 struct nf_ct_tcp_flags {
-	u_int8_t flags;
-	u_int8_t mask;
+	uint8_t flags;
+	uint8_t mask;
 };
+
+#define NFCT_BITMASK_AND	0
+#define NFCT_BITMASK_OR		1
 
 #endif

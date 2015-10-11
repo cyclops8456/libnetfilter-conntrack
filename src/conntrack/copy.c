@@ -89,6 +89,18 @@ static void copy_attr_repl_port_dst(struct nf_conntrack *dest,
 	dest->repl.l4dst.all = orig->repl.l4dst.all;
 }
 
+static void copy_attr_orig_zone(struct nf_conntrack *dest,
+				const struct nf_conntrack *orig)
+{
+	dest->head.orig.zone = orig->head.orig.zone;
+}
+
+static void copy_attr_repl_zone(struct nf_conntrack *dest,
+				const struct nf_conntrack *orig)
+{
+	dest->repl.zone = orig->repl.zone;
+}
+
 static void copy_attr_icmp_type(struct nf_conntrack *dest,
 				const struct nf_conntrack *orig)
 {
@@ -433,6 +445,44 @@ static void copy_attr_timestamp_stop(struct nf_conntrack *dest,
 	dest->timestamp.stop = orig->timestamp.stop;
 }
 
+static void copy_attr_help_info(struct nf_conntrack *dest,
+				const struct nf_conntrack *orig)
+{
+	if (orig->helper_info == NULL)
+		return;
+
+	if (dest->helper_info != NULL)
+		free(dest->helper_info);
+
+	dest->helper_info = calloc(1, orig->helper_info_len);
+	if (dest->helper_info == NULL)
+		return;
+
+	memcpy(dest->helper_info, orig->helper_info, orig->helper_info_len);
+}
+
+static void* do_copy_attr_connlabels(struct nfct_bitmask *dest,
+				     const struct nfct_bitmask *orig)
+{
+	if (orig == NULL)
+		return dest;
+	if (dest)
+		nfct_bitmask_destroy(dest);
+	return nfct_bitmask_clone(orig);
+}
+
+static void copy_attr_connlabels(struct nf_conntrack *dest,
+				 const struct nf_conntrack *orig)
+{
+	dest->connlabels = do_copy_attr_connlabels(dest->connlabels, orig->connlabels);
+}
+
+static void copy_attr_connlabels_mask(struct nf_conntrack *dest,
+				 const struct nf_conntrack *orig)
+{
+	dest->connlabels_mask = do_copy_attr_connlabels(dest->connlabels_mask, orig->connlabels_mask);
+}
+
 const copy_attr copy_attr_array[ATTR_MAX] = {
 	[ATTR_ORIG_IPV4_SRC]		= copy_attr_orig_ipv4_src,
 	[ATTR_ORIG_IPV4_DST] 		= copy_attr_orig_ipv4_dst,
@@ -496,15 +546,28 @@ const copy_attr copy_attr_array[ATTR_MAX] = {
 	[ATTR_TCP_WSCALE_ORIG]		= copy_attr_tcp_wscale_orig,
 	[ATTR_TCP_WSCALE_REPL]		= copy_attr_tcp_wscale_repl,
 	[ATTR_ZONE]			= copy_attr_zone,
+	[ATTR_ORIG_ZONE]		= copy_attr_orig_zone,
+	[ATTR_REPL_ZONE]		= copy_attr_repl_zone,
 	[ATTR_SECCTX]			= copy_attr_secctx,
 	[ATTR_TIMESTAMP_START]		= copy_attr_timestamp_start,
 	[ATTR_TIMESTAMP_STOP]		= copy_attr_timestamp_stop,
+	[ATTR_HELPER_INFO]		= copy_attr_help_info,
+	[ATTR_CONNLABELS]		= copy_attr_connlabels,
+	[ATTR_CONNLABELS_MASK]		= copy_attr_connlabels_mask,
 };
 
 /* this is used by nfct_copy() with the NFCT_CP_OVERRIDE flag set. */
 void __copy_fast(struct nf_conntrack *ct1, const struct nf_conntrack *ct2)
 {
 	memcpy(ct1, ct2, sizeof(*ct1));
-	/* special case: secctx attribute is allocated dinamically. */
+	/* malloc'd attributes: don't free, do copy */
+	ct1->secctx = NULL;
+	ct1->helper_info = NULL;
+	ct1->connlabels = NULL;
+	ct1->connlabels_mask = NULL;
+
 	copy_attr_secctx(ct1, ct2);
+	copy_attr_help_info(ct1, ct2);
+	copy_attr_connlabels(ct1, ct2);
+	copy_attr_connlabels_mask(ct1, ct2);
 }
